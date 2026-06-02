@@ -1,72 +1,53 @@
-# Implementation Changes
+# Changes — Ticking Sound + Mute Feature
 
-## Files Created
+## Files changed
 
-### `Package.swift`
-Swift Package Manager manifest. Declares the `Tamatar` package targeting macOS 13,
-with three targets: `TamatarCore` (library), `Tamatar` (executable), and
-`TamatarCoreTests` (test target).
+### CREATED: `Sources/Tamatar/TickingSoundPlayer.swift`
+New AppKit helper class. Loads the macOS system sound `"Tink"` via
+`NSSound(named:)` once at init. Exposes:
+- `isMuted: Bool` — reads from `UserDefaults` key `"com.tamatar.tickingMuted"` at
+  init (absent key → `false`, i.e. not muted by default).
+- `playTick()` — plays one tick; stops any in-flight sound first to avoid
+  dropped/queued ticks. Silent no-op when muted or sound is unavailable.
+- `setMuted(_:)` — persists the new flag to `UserDefaults`; stops any in-flight
+  sound when muting.
 
-### `README.md`
-Project overview, build/run commands, and usage instructions for the menu-bar app.
+### MODIFIED: `Sources/Tamatar/AppDelegate.swift`
+Three focused changes only:
+1. **New stored property** `private let tickingSound = TickingSoundPlayer()` added
+   alongside the existing `timeUpWindow` property.
+2. **`onTick` closure** updated to call `tickingSound.playTick()` when
+   `remaining > 0` (no tick on the final zero-second callback).
+3. **`buildMenu()`** — a new "Mute Ticking" `NSMenuItem` added between the existing
+   Reset section and Quit, using `#selector(toggleMute(_:))` with checkmark state
+   initialised from the persisted `isMuted` value.
+4. **`toggleMute(_:)`** action added in `// MARK: - Actions` — flips and persists
+   the mute flag, updates the menu item checkmark immediately.
 
-### `.gitignore`
-Ignores `.build/`, `.DS_Store`, and other Swift/Xcode artefacts.
+## Build / test status
+- `swift build` — passes (Build complete).
+- `swift test` — all 33 `PomodoroTimerTests` pass; 0 failures.
+- No changes to `TamatarCore`, `Package.swift`, or any test file.
 
-### `Sources/TamatarCore/PomodoroTimer.swift`
-Pure Swift timer logic — no AppKit, no real wall-clock timers. Exposes:
-- `TimerState` enum: `.idle`, `.running`, `.paused`, `.finished`
-- `PomodoroTimer` class with `start`, `pause`, `resume`, `reset`, `configure(duration:)`,
-  `tick(by:)`, and `formatted(_:)` static helper.
-- Callbacks `onTick` and `onFinish`.
-- All edge-case clamping (duration ≤ 0 → 1s; remaining never below 0; `onFinish`
-  fires exactly once; ticks are no-ops outside `.running`).
+## What the Tester should focus on
 
-### `Sources/Tamatar/main.swift`
-Entry point. Creates `NSApplication.shared`, sets activation policy to `.accessory`
-(no Dock icon), wires up `AppDelegate`, and calls `app.run()`.
+**Automated:** run `swift test` — must still show 33/33 passing.
 
-### `Sources/Tamatar/AppDelegate.swift`
-`NSApplicationDelegate` that owns the menu-bar status item, `PomodoroTimer`, and
-`TimeUpWindow`. Responsibilities:
-- Shows 🍅 when idle/finished, live "MM:SS" countdown while running/paused.
-- Builds `NSMenu` with preset durations (25 / 15 / 5 / 1 min), Start/Pause/Resume/Reset,
-  and Quit.
-- Manages a repeating 1-second `Foundation.Timer` (started/stopped around
-  run/pause/reset/finish) that drives `pomodoro.tick()`.
-- Wires `onTick` → update status title; `onFinish` → stop tick timer, reset title,
-  show `TimeUpWindow`.
+**Manual smoke test (requires macOS GUI session):**
+1. `swift run Tamatar` — menu bar shows 🍅.
+2. Select a preset (e.g. "01:00") → countdown starts; a short tick should be
+   audible each second.
+3. Open menu → "Mute Ticking" has no checkmark. Click it → checkmark appears;
+   ticking stops immediately on the very next second.
+4. Click "Mute Ticking" again → checkmark removed; ticking resumes.
+5. Let timer reach zero → "Time is up" window appears; no tick sound on that
+   final second.
+6. Quit and relaunch → "Mute Ticking" checkmark state matches the last-set value
+   (persistence via `UserDefaults`).
+7. Start a timer, pause it → no ticking while paused; resume → ticking resumes.
+8. Start a timer, reset it → no ticking after reset.
 
-### `Sources/Tamatar/TimeUpWindow.swift`
-Encapsulates a single reusable `NSWindow` (`.floating` level, `isReleasedWhenClosed = false`)
-with a large "Time is up" label and an OK button. `show()` activates the app and
-centers + orders the window front. OK button calls `orderOut` (hides without releasing).
-
-### `Tests/TamatarCoreTests/PomodoroTimerTests.swift`
-XCTest suite for `TamatarCore`. Covers all cases listed in the spec:
-- Happy-path start / tick / finish
-- `onFinish` fires exactly once with extra ticks
-- `tick` no-ops when idle, paused, finished
-- Pause / resume behaviour
-- `configure` ignored while running/paused, honoured when idle/finished
-- Non-positive duration clamped to 1s
-- `reset` from any state
-- Re-`start` after finished
-- `start` while running/paused is no-op
-- Large tick clamped at 0
-- `formatted` table: 0, 5, 65, 1500, fractional, negative, 90-min
-
-## Build Result
-`swift build` — **Build complete** (no warnings, no errors).
-
-## What the Tester Should Focus On
-
-1. **Run `swift test`** — all `PomodoroTimerTests` should pass.
-2. **`onFinish` exactly-once** — key contract; extra ticks after finish must not
-   re-fire the callback.
-3. **Tick clamping** — `tick(by: 100)` on a 5s timer must stop at 0 and fire finish.
-4. **`configure` guard** — must be ignored while running and paused.
-5. **`formatted`** — fractional seconds (floor), negative input, large minute values.
-6. **Manual smoke-test** (optional, requires macOS): `swift run Tamatar` — confirm
-   🍅 in menu bar, preset timers reconfigure cleanly mid-run, "Time is up" window
-   appears and is dismissable.
+**Edge cases to verify:**
+- No crash if `NSSound(named: "Tink")` somehow returns `nil` (handled silently).
+- Rapid ticking: each second's tick replaces the previous (stop-then-play),
+  no audio queuing.

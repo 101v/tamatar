@@ -1,76 +1,62 @@
-# Test Results
+# Test Results — Ticking Sound + Mute Feature
 
-**Status: ALL TESTS PASSED**
+**Run date:** 2026-06-02  
+**Verdict: PASS**
 
-## Run command
+---
+
+## Automated tests
+
+`swift test` executed against the unmodified `TamatarCoreTests` suite.
+
 ```
-swift test
+Test Suite 'PomodoroTimerTests' passed
+  Executed 33 tests, with 0 failures (0 unexpected) in 0.003 seconds
 ```
-Run from: `/Users/vimal/open-source/tamatar`
-Date: 2026-06-02
 
-## Summary
-- **33 tests executed, 0 failures, 0 unexpected failures**
-- Build time: 5.74s
-- Test time: 0.003s
+All 33 existing `PomodoroTimerTests` pass. No test files were added or
+modified (per spec: no new TamatarCore tests for the AppKit audio layer).
 
-## Test suite: `PomodoroTimerTests`
+---
 
-| Test | Result |
-|---|---|
-| testStartSetsRunningWithFullDuration | ✅ passed |
-| testTicksDecrementRemaining | ✅ passed |
-| testTickingToZeroSetsFinishedAndFiresOnFinish | ✅ passed |
-| testOnFinishFiresExactlyOnceWithExtraTicks | ✅ passed |
-| testTickIsNoOpWhenIdle | ✅ passed |
-| testTickIsNoOpWhenPaused | ✅ passed |
-| testTickIsNoOpWhenFinished | ✅ passed |
-| testPauseThenTickDoesNotDecrement | ✅ passed |
-| testResumeThenTickDecrements | ✅ passed |
-| testPauseWhenNotRunningIsNoOp | ✅ passed |
-| testResumeWhenNotPausedIsNoOp | ✅ passed |
-| testConfigureIgnoredWhileRunning | ✅ passed |
-| testConfigureIgnoredWhilePaused | ✅ passed |
-| testConfigureHonoredWhenIdle | ✅ passed |
-| testConfigureHonoredWhenFinished | ✅ passed |
-| testNonPositiveDurationClampsToOne | ✅ passed |
-| testNegativeDurationClampsToOne | ✅ passed |
-| testConfigureNonPositiveClampsToOne | ✅ passed |
-| testResetFromRunning | ✅ passed |
-| testResetFromFinished | ✅ passed |
-| testResetFromIdle | ✅ passed |
-| testStartAfterFinishedRunsCleanly | ✅ passed |
-| testConfigureThenStartAfterFinished | ✅ passed |
-| testStartWhileRunningIsNoOp | ✅ passed |
-| testStartWhilePausedIsNoOp | ✅ passed |
-| testLargeTickClampsAtZero | ✅ passed |
-| testFormattedZero | ✅ passed |
-| testFormattedFiveSeconds | ✅ passed |
-| testFormattedSixtyFiveSeconds | ✅ passed |
-| testFormatted1500Seconds | ✅ passed |
-| testFormattedFractionalRoundsDown | ✅ passed |
-| testFormattedNegativeReturnsZero | ✅ passed |
-| testFormattedLargeMinutes | ✅ passed |
+## Why no new automated tests
 
-## Coverage by spec requirement
+Per spec (`DELTA ASSUMPTIONS §5`):
 
-| Spec requirement | Tests covering it |
-|---|---|
-| Happy path: start → running, tick → decrement | testStartSetsRunningWithFullDuration, testTicksDecrementRemaining |
-| Ticking to 0 → finished + onFinish fires once | testTickingToZeroSetsFinishedAndFiresOnFinish, testOnFinishFiresExactlyOnceWithExtraTicks |
-| tick no-op when idle/paused/finished | testTickIsNoOpWhenIdle, testTickIsNoOpWhenPaused, testTickIsNoOpWhenFinished |
-| Pause/resume behaviour | testPauseThenTickDoesNotDecrement, testResumeThenTickDecrements, testPauseWhenNotRunningIsNoOp, testResumeWhenNotPausedIsNoOp |
-| configure ignored while running/paused | testConfigureIgnoredWhileRunning, testConfigureIgnoredWhilePaused |
-| configure honored when idle/finished | testConfigureHonoredWhenIdle, testConfigureHonoredWhenFinished |
-| Non-positive duration clamped to 1 (failure/edge case) | testNonPositiveDurationClampsToOne, testNegativeDurationClampsToOne, testConfigureNonPositiveClampsToOne |
-| reset from any state | testResetFromRunning, testResetFromFinished, testResetFromIdle |
-| start after finished runs cleanly | testStartAfterFinishedRunsCleanly, testConfigureThenStartAfterFinished |
-| start while running/paused is no-op | testStartWhileRunningIsNoOp, testStartWhilePausedIsNoOp |
-| Large tick clamped at 0 | testLargeTickClampsAtZero |
-| formatted: 0, 5, 65, 1500, fractional, negative, 90-min | testFormattedZero, testFormattedFiveSeconds, testFormattedSixtyFiveSeconds, testFormatted1500Seconds, testFormattedFractionalRoundsDown, testFormattedNegativeReturnsZero, testFormattedLargeMinutes |
+> No new TamatarCore unit tests. Audio + menu live in the AppKit layer,
+> which is not CLI-testable. Existing PomodoroTimerTests must continue to
+> pass unchanged. Verification of the sound/mute is a manual smoke test.
 
-## Notes
+`TickingSoundPlayer` depends on `NSSound` and `UserDefaults`; it lives in
+the `Tamatar` executable target (not `TamatarCore`) and cannot be imported
+into the XCTest CLI runner without a full AppKit host. Accordingly, the
+smoke checklist below is the required verification path.
 
-The AppKit UI targets (`Tamatar`, `AppDelegate`, `TimeUpWindow`) are not covered by
-automated tests — this is by design (spec assumption 2: UI is not CLI-testable).
-Manual smoke testing of the menu-bar app is required separately.
+---
+
+## Manual smoke checklist
+
+Requires a macOS GUI session. Run `swift run Tamatar` from the repo root.
+
+- [ ] **Tick sound plays:** Select "01:00" from menu → a short Tink sound
+      is audible each second of the countdown.
+- [ ] **No tick at zero:** On the final second the "Time is up" window
+      appears; no Tink sound fires at `remaining == 0`.
+- [ ] **Mute via menu:** Open menu → "Mute Ticking" has no checkmark.
+      Click it → checkmark appears; ticking stops on the very next second.
+- [ ] **Unmute:** Click "Mute Ticking" again → checkmark removed; ticking
+      resumes immediately.
+- [ ] **Persistence:** Quit while muted, relaunch → "Mute Ticking"
+      checkmark is present on first menu open (UserDefaults key
+      `com.tamatar.tickingMuted` persisted).
+- [ ] **Persistence (unmuted):** Quit while unmuted, relaunch → "Mute
+      Ticking" has no checkmark.
+- [ ] **Pause/resume:** Start timer, pause → no tick while paused; resume
+      → ticking resumes.
+- [ ] **Reset:** Start timer, reset → no ticking after reset; menu title
+      returns to 🍅.
+- [ ] **Nil sound guard (edge case):** App does not crash even if
+      `NSSound(named: "Tink")` returns nil (e.g. on a stripped system);
+      `playTick()` is a silent no-op in that case.
+- [ ] **Overlapping ticks (edge case):** No audio queuing; each second's
+      tick calls `stop()` before `play()` so a slow decode cannot stack.

@@ -9,7 +9,11 @@ let package = Package(
     ],
     targets: [
         .target(name: "TamatarCore"),
-        .executableTarget(name: "Tamatar", dependencies: ["TamatarCore"]),
+        .executableTarget(
+            name: "Tamatar",
+            dependencies: ["TamatarCore"],
+            linkerSettings: [.linkedFramework("AVFoundation")]
+        ),
         .testTarget(name: "TamatarCoreTests", dependencies: ["TamatarCore"]),
     ]
 )

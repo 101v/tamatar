@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let pomodoro = PomodoroTimer()
     private var tickTimer: Timer?
     private let timeUpWindow = TimeUpWindow()
+    private let tickingSound = TickingSoundPlayer()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -14,6 +15,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pomodoro.onTick = { [weak self] remaining in
             DispatchQueue.main.async {
                 self?.statusItem.button?.title = PomodoroTimer.formatted(remaining)
+                if remaining > 0 {
+                    self?.tickingSound.playTick()
+                }
             }
         }
 
@@ -65,6 +69,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(.separator())
 
+        let muteItem = NSMenuItem(title: "Mute Ticking", action: #selector(toggleMute(_:)), keyEquivalent: "")
+        muteItem.target = self
+        muteItem.state = tickingSound.isMuted ? .on : .off
+        menu.addItem(muteItem)
+
+        menu.addItem(.separator())
+
         let quitItem = NSMenuItem(title: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quitItem)
 
@@ -99,6 +110,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         pomodoro.resume()
         startTickTimer()
         updateStatusTitle()
+    }
+
+    @objc private func toggleMute(_ sender: NSMenuItem) {
+        let newValue = !tickingSound.isMuted
+        tickingSound.setMuted(newValue)
+        sender.state = newValue ? .on : .off
     }
 
     @objc private func resetTimer() {

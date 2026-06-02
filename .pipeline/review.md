@@ -1,84 +1,80 @@
-# Final Review — Tamatar
+# Review — Ticking Sound + Mute Feature
+
+**Run date:** 2026-06-02
+**Reviewer:** final-stage (read-only)
 
 ## VERDICT: SHIP
 
-The implementation matches the spec, builds cleanly, and the tests are
-meaningful (not superficial). I independently re-ran the pipeline rather than
-trusting the handoff files:
-
-- `swift build` → **Build complete!**, no warnings/errors.
-- `swift test` → **33 tests, 0 failures** (confirmed locally, not just from
-  `test-results.md`).
-
-All core requirements from the original request are met: a background macOS
-menu-bar app (no Dock icon via `.accessory`), a 🍅 status item with presets,
-a live MM:SS countdown, and a "Time is up" on-screen window when the timer
-hits zero.
-
 ---
+
+## What was reviewed
+
+- `.pipeline/spec.md` (FEATURE DELTA section)
+- `.pipeline/changes.md`, `.pipeline/test-results.md`
+- `git diff` of the two changed files
+- `Sources/Tamatar/TickingSoundPlayer.swift` (new)
+- `Sources/Tamatar/AppDelegate.swift` (modified)
+- `Sources/TamatarCore/PomodoroTimer.swift` (read for `onTick`-at-zero semantics)
+
+## Independent verification
+
+| Check | Result |
+|---|---|
+| `swift build` | Build complete, exit 0, no warnings |
+| `swift test` | 33/33 passed, 0 failures, exit 0 |
+
+Matches the Tester's reported results.
 
 ## Spec conformance
 
-| Spec item | Status |
-|---|---|
-| SPM layout, macOS 13, `TamatarCore` lib + `Tamatar` exe + test target | ✅ exact (`Package.swift`) |
-| `PomodoroTimer` state machine (idle/running/paused/finished) | ✅ |
-| Duration ≤ 0 clamped to 1 (init + configure) | ✅ |
-| `configure` ignored while running/paused | ✅ |
-| `start` no-op while running/paused; clean re-run after finished | ✅ |
-| `tick` no-op outside `.running`, clamps at 0 | ✅ |
-| `onFinish` fires exactly once | ✅ |
-| `formatted` floor / negative→"00:00" / minutes uncapped | ✅ |
-| `.accessory` activation policy, no Dock icon | ✅ (`main.swift`) |
-| Status item: 🍅 idle, MM:SS running/paused | ✅ (`AppDelegate`) |
-| Presets 25/15/5/1, Start/Pause/Resume/Reset, Quit | ✅ |
-| 1s `Foundation.Timer` started/stopped around run/pause/reset/finish | ✅ |
-| Preset mid-run reconfigures cleanly (reset→configure→start) | ✅ |
-| `TimeUpWindow`: floating, `isReleasedWhenClosed=false`, reused, OK→orderOut | ✅ |
-| `NSApp.activate(ignoringOtherApps:)` before showing | ✅ |
-| Non-goals (sounds, notifications, persistence, custom entry) not built | ✅ |
+Every DELTA ASSUMPTION and edge case is satisfied:
 
-## Test quality
+1. **Sound source** — `NSSound(named: "Tink")`, no bundled asset. ✔
+2. **Scope** — only `Tamatar` target touched; `TamatarCore`, `Package.swift`,
+   `TimeUpWindow.swift`, `main.swift`, and tests are untouched. ✔
+3. **Driven by `onTick`** — no second timer added; tick plays inside the
+   existing `onTick` closure on the main thread. ✔
+4. **Persistence** — `UserDefaults` key `com.tamatar.tickingMuted`, read in
+   `init`, written in `setMuted`; absent key → `false` (unmuted default). ✔
+5. **No new core tests** — existing `PomodoroTimerTests` unchanged and green. ✔
 
-Genuine assertions on real state transitions and edge cases (clamping,
-exactly-once finish, large-tick clamp, configure guards, format table). Not
-tautological or superficial. UI targets are intentionally uncovered per spec
-assumption 2 (AppKit is not CLI-testable); this is acceptable and disclosed.
+Public surface of `TickingSoundPlayer` matches the spec signature exactly
+(`isMuted` private(set), `init(soundName:)`, `playTick()`, `setMuted(_:)`).
 
-## Security / performance / correctness
+## Correctness (the parts that matter beyond green tests)
 
-- No network, file I/O, persistence, or external input — no security surface.
-- Tick timer is invalidated on pause/reset/finish, so no idle CPU wakeups.
-- UI callbacks correctly marshalled to the main thread; `[weak self]` used
-  throughout — no retain cycles.
-- No correctness defects found in the delivered behavior.
+- **No tick at zero — verified, not assumed.** `PomodoroTimer.tick()` fires
+  `onTick(0)` on the final 1→0 step (line 57) *before* `onFinish` (line 60).
+  The `if remaining > 0` guard in `AppDelegate` therefore genuinely suppresses
+  the competing tick on the last second. The guard is meaningful and correct.
+- **Nil-sound safety** — `guard !isMuted, let sound else { return }` in
+  `playTick()`; `sound?.stop()` in `setMuted`. No force-unwraps. A stripped
+  system that returns `nil` is a silent no-op, no crash.
+- **Overlapping ticks** — stop-then-play (`if sound.isPlaying { sound.stop() }`)
+  prevents queuing/stacking on slow decode, per spec.
+- **Immediate mute** — `isMuted` is read per call in `playTick()`, so a toggle
+  silences the very next tick.
+- **Threading** — all `NSSound` calls reach the player from the main thread
+  (via the existing `DispatchQueue.main.async` in `onTick`, and the menu action
+  which is already on main). No data races.
+- **Mute-when-muting stop** — `setMuted(true)` stops any in-flight sound so a
+  tick already playing is cut, matching the spec.
 
----
+## Notes (non-blocking, no action required)
 
-## Non-blocking notes (optional follow-ups, do NOT block the ship)
+- The new "Mute Ticking" item is placed in its own separator-bounded section
+  between Reset and Quit — matches the spec snippet and the existing
+  `NSMenuItem` + `target = self` + `@objc private` pattern.
+- The AppKit audio/menu layer remains outside automated CLI coverage by design
+  (same boundary as the prior spec). The manual smoke checklist in
+  `test-results.md` is the correct verification path and is complete. Human
+  sign-off should run that checklist on a GUI session before merge — in
+  particular: audible tick each second, mute checkmark toggles + persists
+  across relaunch, and no tick on the final second.
 
-1. **`PomodoroTimer.tick` fires `onTick` even when `remaining` is unchanged**
-   (`Sources/TamatarCore/PomodoroTimer.swift:57`). The spec doc says "fires
-   `onTick` when remaining changes." Harmless with the real 1s driver
-   (always ticks by 1), but a literal reading differs. Could guard with a
-   pre/post comparison if strict adherence is desired.
-2. **`tick(by:)` does not guard negative `seconds`**
-   (`PomodoroTimer.swift:56`): a negative argument would *increase*
-   `remaining`. Not reachable from the UI (driver always ticks by +1), but a
-   `max(seconds, 0)` or precondition would harden the public API.
-3. **Test coverage gap**: there is no positive test asserting `onTick` is
-   invoked with the correct value during a normal running tick — only
-   negative ("not called") cases exist. Behavior is trivially correct, but a
-   one-line positive assertion would close the loop.
-4. **`TimeUpWindow` style is `[.titled, .closable]`** while the spec said
-   "titled, centered." Adding `.closable` is a reasonable UX improvement, not
-   a defect — flagging only for spec-trace completeness.
+## Bottom line
 
-None of the above affect the requested feature's behavior, so they are
-deferred rather than required.
-
-## Recommendation
-
-Ship-ready. Leave on `main` (currently all untracked, no commit made) for
-human morning review. The four notes above are nice-to-haves for a follow-up
-commit, not gating issues.
+Code matches the spec exactly, build and tests are green on an independent run,
+and the one behavior that green tests do *not* cover (no tick at zero, nil/
+threading/overlap safety) was traced through the source and holds. Ship it —
+pending the manual GUI smoke checklist at human sign-off.

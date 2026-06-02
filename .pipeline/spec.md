@@ -4,6 +4,183 @@ A macOS menu-bar Pomodoro timer. Runs in the background (no Dock icon), shows a
 menu-bar item, lets the user start a countdown timer, and pops a "Time is up"
 window on screen when the timer reaches zero.
 
+---
+
+# FEATURE DELTA (current task): Ticking Sound + Mute
+
+> This section is the spec for the CURRENT feature only. It is self-contained:
+> the Coder implements exactly what is below. The rest of this file (after the
+> `---` divider) is prior context describing the already-built app.
+
+**Feature request:** Play a ticking sound each second while the timer is
+running, and give the user a menu option to mute it.
+
+## OPEN QUESTIONS (feature delta)
+
+None blocking. Reasonable defaults chosen below; see DELTA ASSUMPTIONS. Proceed.
+
+## DELTA ASSUMPTIONS (decisions made by the planner — do not re-litigate)
+
+1. **Sound source = macOS system sound, no bundled audio asset.** Use
+   `NSSound(named:)` with the built-in system sound named **`"Tink"`** (a short
+   tick from `/System/Library/Sounds`). Rationale: avoids shipping a binary
+   `.wav`/`.aiff` resource and the SPM `resources:`/`Bundle.module` plumbing an
+   executable target would otherwise need. One short sound played per 1-second
+   tick reads as "ticking." If a future continuous-loop clock sound is wanted,
+   that requires a bundled asset — out of scope here.
+2. **Where sound lives:** AppKit executable target `Tamatar` ONLY. `TamatarCore`
+   stays pure (no AppKit, no audio) so it remains CLI-unit-testable. No changes
+   to `PomodoroTimer.swift`.
+3. **Driving the sound:** play one tick inside the existing `pomodoro.onTick`
+   callback in `AppDelegate` (it already fires once per second only while
+   running and is already dispatched to the main thread). Do NOT add a second
+   timer.
+4. **Mute is persistent.** Store the muted flag in `UserDefaults` under key
+   `"com.tamatar.tickingMuted"` so the choice survives app restarts. Default =
+   **not muted** (ticking on) on first launch.
+5. **No new TamatarCore unit tests.** Audio + menu live in the AppKit layer,
+   which is not CLI-testable (same boundary the prior spec set). Existing
+   `PomodoroTimerTests` must continue to pass unchanged. Verification of the
+   sound/mute is a manual smoke test (see Tester notes at end of delta).
+
+## Files to modify / create (feature delta — exact paths)
+
+```
+CREATE  Sources/Tamatar/TickingSoundPlayer.swift
+MODIFY  Sources/Tamatar/AppDelegate.swift
+```
+
+No changes to `Package.swift`, `TamatarCore`, `TimeUpWindow.swift`,
+`main.swift`, or the tests.
+
+### CREATE — `Sources/Tamatar/TickingSoundPlayer.swift`
+
+A small, focused AppKit helper. **Follow the style of the existing
+`Sources/Tamatar/TimeUpWindow.swift`** (a `final class` that wraps one AppKit
+concern, private state, minimal public surface).
+
+```swift
+import AppKit
+
+final class TickingSoundPlayer {
+    /// Current mute state. Backed by UserDefaults.
+    private(set) var isMuted: Bool
+
+    /// Loads the persisted mute flag (default: not muted) and prepares the
+    /// system sound. `soundName` defaults to "Tink".
+    init(soundName: String = "Tink")
+
+    /// Plays one tick. No-op if muted or if the sound could not be loaded.
+    /// Must be called on the main thread. Restart the sound if it is still
+    /// playing (stop-then-play) so rapid 1s ticks are not dropped.
+    func playTick()
+
+    /// Sets and persists the mute flag. When muting, stop any in-flight sound.
+    func setMuted(_ muted: Bool)
+}
+```
+
+Implementation notes:
+- Hold a single `private let sound: NSSound?` from
+  `NSSound(named: NSSound.Name(soundName))`. It may be `nil` — guard everywhere.
+- Persistence: read in `init` via
+  `UserDefaults.standard.bool(forKey: "com.tamatar.tickingMuted")` (absent key
+  ⇒ `false` ⇒ not muted, which is the desired default). Write in `setMuted`.
+- `playTick()`: `guard !isMuted, let sound else { return }`; if
+  `sound.isPlaying { sound.stop() }`; then `sound.play()`.
+- Keep the UserDefaults key as a single named constant in this file.
+
+### MODIFY — `Sources/Tamatar/AppDelegate.swift`
+
+1. **Add a stored property** next to the existing `timeUpWindow`:
+
+```swift
+private let tickingSound = TickingSoundPlayer()
+```
+
+2. **Play a tick on each second.** In `applicationDidFinishLaunching`, inside the
+   existing `pomodoro.onTick` closure (which already does
+   `DispatchQueue.main.async { ... }`), play a tick — but only when time
+   remains, so the final tick to `0` (which simultaneously triggers the
+   "Time is up" window) does NOT also tick:
+
+```swift
+pomodoro.onTick = { [weak self] remaining in
+    DispatchQueue.main.async {
+        self?.statusItem.button?.title = PomodoroTimer.formatted(remaining)
+        if remaining > 0 {
+            self?.tickingSound.playTick()
+        }
+    }
+}
+```
+
+3. **Add the mute menu item.** In `buildMenu()`, insert a new section before the
+   final `.separator()` / "Quit" block (follow the existing `NSMenuItem` +
+   `item.target = self` pattern used for Start/Pause/etc.):
+
+```swift
+menu.addItem(.separator())
+
+let muteItem = NSMenuItem(title: "Mute Ticking", action: #selector(toggleMute(_:)), keyEquivalent: "")
+muteItem.target = self
+muteItem.state = tickingSound.isMuted ? .on : .off
+menu.addItem(muteItem)
+```
+
+   The checkmark (`.state`) reflects current mute state; initialize it from the
+   persisted value so the menu is correct on launch.
+
+4. **Add the action** in the `// MARK: - Actions` section, matching the existing
+   private `@objc` action style:
+
+```swift
+@objc private func toggleMute(_ sender: NSMenuItem) {
+    let newValue = !tickingSound.isMuted
+    tickingSound.setMuted(newValue)
+    sender.state = newValue ? .on : .off
+}
+```
+
+## Edge cases the implementation MUST handle (feature delta)
+
+- **Sound unavailable:** `NSSound(named:)` returns `nil` → `playTick()` is a
+  silent no-op; app must not crash.
+- **No tick at zero:** the tick to `remaining == 0` must NOT play a tick sound
+  (guarded by `remaining > 0`); only the "Time is up" window fires there.
+- **No ticking when not running:** ticking is driven solely by `onTick`, which
+  only fires while `.running`. Pause/Reset/finish already stop the 1s timer, so
+  no extra muting logic is needed on those paths.
+- **Mute takes effect immediately:** toggling while running silences the very
+  next tick (state is read per-tick in `playTick()`).
+- **Overlapping ticks:** if a sound is still playing when the next tick arrives,
+  stop-then-play so ticks aren't dropped or queued.
+- **Persistence:** mute choice is read on launch and written on every toggle;
+  default on first launch is unmuted.
+- **Threading:** all `NSSound` calls happen on the main thread (via the existing
+  `DispatchQueue.main.async` in `onTick`, and menu actions are already on main).
+
+## Existing patterns to follow (feature delta)
+
+- `Sources/Tamatar/TimeUpWindow.swift` — model `TickingSoundPlayer` on this:
+  small `final class`, AppKit-only, private state, tiny public API.
+- `Sources/Tamatar/AppDelegate.swift` — menu items are `NSMenuItem` with
+  `item.target = self`; actions are `private @objc func`. Match that exactly.
+
+## Tester notes (feature delta)
+
+- `swift build` and `swift test` must still pass (no core changes; existing
+  `PomodoroTimerTests` unaffected).
+- Manual smoke test (requires macOS GUI session): `swift run Tamatar`, start a
+  1-minute preset → hear a tick each second; toggle "Mute Ticking" (checkmark
+  appears) → ticking stops immediately; untoggle → resumes; on the final second
+  the "Time is up" window appears without a competing tick; quit and relaunch →
+  mute state is remembered.
+
+---
+
+# PRIOR CONTEXT — already-built app (for reference only; NOT part of this task)
+
 ## OPEN QUESTIONS
 
 None blocking. Reasonable defaults chosen below; see ASSUMPTIONS. Proceed.
