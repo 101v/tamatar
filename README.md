@@ -2,30 +2,52 @@
 
 A macOS menu-bar Pomodoro timer. *Tamatar* is the Hindi word for tomato (pomodoro).
 
-Runs as a background app (no Dock icon) with a 🍅 icon in the macOS menu bar.
-Select a preset duration, start the countdown, and get an on-screen alert when time is up.
+Runs in the background (no Dock icon) with a 🍅 in the menu bar. Pick a duration, focus, and get an on-screen alert when time is up.
 
-## Requirements
-
-- macOS 13+
-- Swift 5.9+ (Xcode 15+ for Homebrew builds)
+**Requirements:** macOS 13+ · [Homebrew](https://brew.sh) · Xcode 15+ (needed to build)
 
 ## Install
-
-### Homebrew
 
 ```bash
 brew tap 101v/tamatar https://github.com/101v/tamatar
 brew trust 101v/tamatar
 brew install tamatar
+```
+
+Then start it:
+
+```bash
 tamatar
 ```
 
-This installs `Tamatar.app`, links it into `~/Applications` (for Spotlight), and adds a `tamatar` command that launches the app without blocking your terminal.
+Or open **Tamatar** from Spotlight (`⌘ Space`). The app is linked into `~/Applications`.
 
-For the latest unreleased commits: `brew install --HEAD tamatar`. Release steps are in [RELEASING.md](RELEASING.md).
+> Third-party Homebrew taps must be trusted once with `brew trust` before install.
 
-### From source
+## Use
+
+Click the 🍅 in the menu bar:
+
+| Action | What it does |
+| --- | --- |
+| **25:00 / 15:00 / 05:00 / 01:00** | Set that duration and start immediately |
+| **Start** | Begin countdown with the current duration |
+| **Pause / Resume** | Pause or continue the running timer |
+| **Reset** | Return to idle |
+| **Quit** | Exit the app |
+
+When the timer hits zero, a **Time is up** window appears. Click **OK** to dismiss it.
+
+To quit from the terminal: `killall Tamatar`
+
+## Upgrade
+
+```bash
+brew update
+brew upgrade tamatar
+```
+
+## Install from source
 
 ```bash
 git clone https://github.com/101v/tamatar.git
@@ -34,37 +56,15 @@ cd tamatar
 open Tamatar.app
 ```
 
-Or run the binary directly (detaches from the terminal unless you pass `--foreground`):
+## Development
 
 ```bash
-swift build -c release
-.build/release/Tamatar
-```
-
-## Build & Run (development)
-
-```bash
-# Build
 swift build
-
-# Run tests (TamatarCore logic only — AppKit UI is not CLI-testable)
 swift test
-
-# Run attached to the terminal (useful while debugging)
 swift run Tamatar -- --foreground
 ```
 
-## Usage
-
-Click the 🍅 icon in the menu bar:
-
-- **Preset durations** — 25:00, 15:00, 05:00, 01:00 — configure and start immediately.
-- **Start** — begin countdown with the current duration.
-- **Pause / Resume** — pause or resume the running timer.
-- **Reset** — return to idle.
-- **Quit** — exit the app.
-
-When the timer reaches zero a "Time is up" window appears on screen. Click **OK** to dismiss it.
+Release steps for maintainers: [RELEASING.md](RELEASING.md).
 
 ## License
 
