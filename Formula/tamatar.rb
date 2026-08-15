@@ -1,8 +1,8 @@
 class Tamatar < Formula
   desc "macOS menu-bar Pomodoro timer"
   homepage "https://github.com/101v/tamatar"
-  url "https://github.com/101v/tamatar/archive/refs/tags/v1.0.1.tar.gz"
-  sha256 "9aa4addb115d0531048259c0383fdc7556e9eff9da943593cc7ee4df14867272"
+  url "https://github.com/101v/tamatar/archive/refs/tags/v1.0.2.tar.gz"
+  sha256 "37886d7f7726036646d64e9b8abfb818a873a0f345037a8de2ac17c84d79a2bc"
   license "MIT"
   head "https://github.com/101v/tamatar.git", branch: "main"
 
