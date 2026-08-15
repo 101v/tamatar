@@ -8,9 +8,30 @@ Select a preset duration, start the countdown, and get an on-screen alert when t
 ## Requirements
 
 - macOS 13+
-- Swift 5.9+
+- Swift 5.9+ (Xcode 15+ for Homebrew builds)
 
-## Build & Run
+## Install
+
+### Homebrew
+
+```bash
+brew tap 101v/tamatar https://github.com/101v/tamatar
+brew install --HEAD tamatar
+Tamatar
+```
+
+After the first tagged release (see [RELEASING.md](RELEASING.md)), you can drop `--HEAD`.
+
+### From source
+
+```bash
+git clone https://github.com/101v/tamatar.git
+cd tamatar
+swift build -c release
+.build/release/Tamatar
+```
+
+## Build & Run (development)
 
 ```bash
 # Build
@@ -34,3 +55,7 @@ Click the 🍅 icon in the menu bar:
 - **Quit** — exit the app.
 
 When the timer reaches zero a "Time is up" window appears on screen. Click **OK** to dismiss it.
+
+## License
+
+[MIT](LICENSE)
