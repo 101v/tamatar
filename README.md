@@ -16,11 +16,11 @@ Select a preset duration, start the countdown, and get an on-screen alert when t
 
 ```bash
 brew tap 101v/tamatar https://github.com/101v/tamatar
-brew install --HEAD tamatar
+brew install tamatar
 Tamatar
 ```
 
-After the first tagged release (see [RELEASING.md](RELEASING.md)), you can drop `--HEAD`.
+For the latest unreleased commits: `brew install --HEAD tamatar`. Release steps are in [RELEASING.md](RELEASING.md).
 
 ### From source
 

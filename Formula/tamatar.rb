@@ -1,12 +1,10 @@
 class Tamatar < Formula
   desc "macOS menu-bar Pomodoro timer"
   homepage "https://github.com/101v/tamatar"
+  url "https://github.com/101v/tamatar/archive/refs/tags/v1.0.0.tar.gz"
+  sha256 "3f73d3fab9f4c1e089e627210476f7b702af5ba3d7af8dd9523f6154da182093"
   license "MIT"
   head "https://github.com/101v/tamatar.git", branch: "main"
-
-  # After tagging v1.0.0, uncomment and set the checksum (see RELEASING.md):
-  # url "https://github.com/101v/tamatar/archive/refs/tags/v1.0.0.tar.gz"
-  # sha256 "REPLACE_WITH_TARBALL_SHA256"
 
   depends_on xcode: ["15.0", :build]
   depends_on macos: :ventura
