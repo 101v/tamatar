@@ -18,15 +18,12 @@ class Tamatar < Formula
     contents.install "Packaging/Info.plist"
 
     # Launch via Launch Services so the terminal is not blocked and Spotlight can find the .app.
-    (bin/"Tamatar").write <<~EOS
-      #!/bin/bash
-      exec open "#{opt_prefix}/Tamatar.app" --args "$@"
-    EOS
+    # One name only: macOS default volumes are case-insensitive, so Tamatar/tamatar collide in bin/.
     (bin/"tamatar").write <<~EOS
       #!/bin/bash
       exec open "#{opt_prefix}/Tamatar.app" --args "$@"
     EOS
-    chmod "+x", bin/"Tamatar", bin/"tamatar"
+    chmod "+x", bin/"tamatar"
   end
 
   def post_install
@@ -39,7 +36,7 @@ class Tamatar < Formula
     <<~EOS
       Tamatar is a menu-bar app (no Dock icon). Start it with:
 
-        Tamatar
+        tamatar
 
       or via Spotlight after it indexes ~/Applications/Tamatar.app.
 
@@ -51,6 +48,6 @@ class Tamatar < Formula
 
   test do
     assert_predicate prefix/"Tamatar.app/Contents/MacOS/Tamatar", :executable?
-    assert_predicate bin/"Tamatar", :executable?
+    assert_predicate bin/"tamatar", :executable?
   end
 end

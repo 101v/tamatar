@@ -18,10 +18,10 @@ Select a preset duration, start the countdown, and get an on-screen alert when t
 brew tap 101v/tamatar https://github.com/101v/tamatar
 brew trust 101v/tamatar
 brew install tamatar
-Tamatar
+tamatar
 ```
 
-This installs `Tamatar.app`, links it into `~/Applications` (for Spotlight), and adds a `Tamatar` / `tamatar` command that launches the app without blocking your terminal.
+This installs `Tamatar.app`, links it into `~/Applications` (for Spotlight), and adds a `tamatar` command that launches the app without blocking your terminal.
 
 For the latest unreleased commits: `brew install --HEAD tamatar`. Release steps are in [RELEASING.md](RELEASING.md).
 
