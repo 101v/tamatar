@@ -14,8 +14,10 @@ class Tamatar < Formula
 
     contents = prefix/"Tamatar.app/Contents"
     (contents/"MacOS").mkpath
+    (contents/"Resources").mkpath
     (contents/"MacOS").install ".build/release/Tamatar"
     contents.install "Packaging/Info.plist"
+    (contents/"Resources").install "Packaging/AppIcon.icns"
 
     # Launch via Launch Services so the terminal is not blocked and Spotlight can find the .app.
     # One name only: macOS default volumes are case-insensitive, so Tamatar/tamatar collide in bin/.
@@ -48,6 +50,7 @@ class Tamatar < Formula
 
   test do
     assert_predicate prefix/"Tamatar.app/Contents/MacOS/Tamatar", :executable?
+    assert_predicate prefix/"Tamatar.app/Contents/Resources/AppIcon.icns", :exist?
     assert_predicate bin/"tamatar", :executable?
   end
 end
