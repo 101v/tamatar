@@ -1,5 +1,6 @@
 .DS_Store
 .build/
+Tamatar.app/
 *.o
 *.d
 *.swp

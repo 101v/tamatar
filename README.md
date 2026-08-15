@@ -21,6 +21,8 @@ brew install tamatar
 Tamatar
 ```
 
+This installs `Tamatar.app`, links it into `~/Applications` (for Spotlight), and adds a `Tamatar` / `tamatar` command that launches the app without blocking your terminal.
+
 For the latest unreleased commits: `brew install --HEAD tamatar`. Release steps are in [RELEASING.md](RELEASING.md).
 
 ### From source
@@ -28,6 +30,13 @@ For the latest unreleased commits: `brew install --HEAD tamatar`. Release steps 
 ```bash
 git clone https://github.com/101v/tamatar.git
 cd tamatar
+./scripts/package-app.sh
+open Tamatar.app
+```
+
+Or run the binary directly (detaches from the terminal unless you pass `--foreground`):
+
+```bash
 swift build -c release
 .build/release/Tamatar
 ```
@@ -41,8 +50,8 @@ swift build
 # Run tests (TamatarCore logic only — AppKit UI is not CLI-testable)
 swift test
 
-# Run the app
-swift run Tamatar
+# Run attached to the terminal (useful while debugging)
+swift run Tamatar -- --foreground
 ```
 
 ## Usage
