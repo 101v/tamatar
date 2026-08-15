@@ -16,6 +16,7 @@ Select a preset duration, start the countdown, and get an on-screen alert when t
 
 ```bash
 brew tap 101v/tamatar https://github.com/101v/tamatar
+brew trust 101v/tamatar
 brew install tamatar
 Tamatar
 ```

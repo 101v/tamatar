@@ -47,6 +47,7 @@ brew install --HEAD tamatar
 
 ```bash
 brew tap 101v/tamatar https://github.com/101v/tamatar
+brew trust 101v/tamatar
 brew install tamatar
 ```
 
@@ -55,6 +56,8 @@ brew install tamatar
 ```bash
 brew install --HEAD --formula ./Formula/tamatar.rb
 ```
+
+Third-party taps must be trusted once with `brew trust` before Homebrew will load their formulas.
 
 ## 5. Optional: dedicated tap
 
